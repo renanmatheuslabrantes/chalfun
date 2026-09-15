@@ -1,7 +1,5 @@
 const crypto = require("node:crypto");
 
-const sessions = globalThis.__chalfunSessions || new Map();
-globalThis.__chalfunSessions = sessions;
 const attempts = globalThis.__chalfunLoginAttempts || new Map();
 globalThis.__chalfunLoginAttempts = attempts;
 const sessionMaxAge = 8 * 60 * 60 * 1000;
@@ -17,25 +15,33 @@ function parseCookies(request) {
 
 function isAuthenticated(request) {
   const token = parseCookies(request).chalfun_session;
-  const expiresAt = token && sessions.get(token);
-  if (!expiresAt) return false;
-  if (expiresAt <= Date.now()) {
-    sessions.delete(token);
+  if (!token || !process.env.ADMIN_PASSWORD_HASH) return false;
+  const [payload, signature] = token.split(".");
+  if (!payload || !signature || !timingSafeSignature(payload, signature)) return false;
+  try {
+    const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    return data.exp > Date.now();
+  } catch {
     return false;
   }
-  return true;
 }
 
 function createSession(response) {
-  const token = crypto.randomBytes(32).toString("base64url");
-  sessions.set(token, Date.now() + sessionMaxAge);
+  const payload = Buffer.from(JSON.stringify({ exp: Date.now() + sessionMaxAge })).toString("base64url");
+  const signature = crypto.createHmac("sha256", process.env.ADMIN_PASSWORD_HASH).update(payload).digest("base64url");
+  const token = `${payload}.${signature}`;
   response.setHeader("Set-Cookie", cookieHeader("chalfun_session", token, sessionMaxAge));
 }
 
 function clearSession(request, response) {
-  const token = parseCookies(request).chalfun_session;
-  if (token) sessions.delete(token);
   response.setHeader("Set-Cookie", cookieHeader("chalfun_session", "", 0));
+}
+
+function timingSafeSignature(payload, signature) {
+  const expected = crypto.createHmac("sha256", process.env.ADMIN_PASSWORD_HASH).update(payload).digest("base64url");
+  const actualBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expected);
+  return actualBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(actualBuffer, expectedBuffer);
 }
 
 function verifyPassword(password, encodedHash) {
