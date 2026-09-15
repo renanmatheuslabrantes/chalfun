@@ -405,19 +405,6 @@
             <div class="admin-case-list" data-admin-case-list></div>
           </div>
 
-          <div class="admin-password-section">
-            <h3>Trocar senha</h3>
-            <form class="admin-form" data-password-form>
-              <label for="current-password">Senha atual</label>
-              <input id="current-password" name="currentPassword" type="password" autocomplete="current-password" required />
-              <label for="new-password">Nova senha</label>
-              <input id="new-password" name="newPassword" type="password" autocomplete="new-password" minlength="8" required />
-              <label for="confirm-password">Confirmar nova senha</label>
-              <input id="confirm-password" name="confirmPassword" type="password" autocomplete="new-password" minlength="8" required />
-              <button class="btn btn-secondary" type="submit">Salvar nova senha</button>
-              <p class="admin-message" data-password-message role="status"></p>
-            </form>
-          </div>
         </div>
       </section>
     </div>
@@ -445,10 +432,6 @@
       })();
 
       (function () {
-        var defaultPassword = "SIDNEYCHALFUN";
-        var passwordKey = "chalfun-admin-password";
-        var casesKey = "chalfun-extra-cases";
-        var sessionKey = "chalfun-admin-session";
         var modal = document.querySelector("[data-admin-modal]");
         var loginView = document.querySelector("[data-admin-login]");
         var panelView = document.querySelector("[data-admin-panel]");
@@ -457,13 +440,16 @@
         var adminCaseList = document.querySelector("[data-admin-case-list]");
         if (!modal || !casesGrid) return;
 
-        function getCases() {
-          try {
-            var savedCases = JSON.parse(localStorage.getItem(casesKey) || "[]");
-            return Array.isArray(savedCases) ? savedCases : [];
-          } catch (error) {
-            return [];
-          }
+        async function apiRequest(url, options) {
+          var response = await fetch(url, Object.assign({ headers: { "Content-Type": "application/json" } }, options || {}));
+          var data = await response.json().catch(function () { return {}; });
+          if (!response.ok) throw new Error(data.error || "Não foi possível concluir a operação.");
+          return data;
+        }
+
+        async function getCases() {
+          var savedCases = await apiRequest("/api/cases");
+          return Array.isArray(savedCases) ? savedCases : [];
         }
 
         function normalizePlainText(value, maxLength) {
@@ -495,10 +481,9 @@
           casesGrid.appendChild(article);
         }
 
-        function renderAdminCaseList() {
+        function renderAdminCaseList(savedCases) {
           if (!adminCaseList) return;
           adminCaseList.textContent = "";
-          var savedCases = getCases();
           if (!savedCases.length) {
             var emptyMessage = document.createElement("p");
             emptyMessage.className = "admin-empty";
@@ -506,7 +491,7 @@
             adminCaseList.appendChild(emptyMessage);
             return;
           }
-          savedCases.forEach(function (item, index) {
+          savedCases.forEach(function (item) {
             var row = document.createElement("div");
             row.className = "admin-case-row";
             var title = document.createElement("strong");
@@ -520,14 +505,17 @@
             removeButton.setAttribute("aria-label", "Excluir o case " + item.title);
             removeButton.addEventListener("click", function () {
               if (!window.confirm("Excluir o case \"" + item.title + "\"?")) return;
-              var currentCases = getCases();
-              currentCases.splice(index, 1);
-              localStorage.setItem(casesKey, JSON.stringify(currentCases));
-              document.querySelectorAll("[data-extra-case]").forEach(function (caseCard) {
-                caseCard.remove();
+              apiRequest("/api/cases/" + encodeURIComponent(item.id), { method: "DELETE" })
+                .then(function () {
+                  document.querySelectorAll("[data-extra-case]").forEach(function (caseCard) {
+                    caseCard.remove();
+                  });
+                  return renderSavedCases();
+                })
+                .catch(function (error) {
+                  window.alert(error.message);
+                });
               });
-              renderSavedCases();
-            });
             row.appendChild(title);
             row.appendChild(subtitle);
             row.appendChild(removeButton);
@@ -542,10 +530,15 @@
           });
         }
 
-        function renderSavedCases() {
-          getCases().forEach(renderCase);
-          updateCaseCount();
-          renderAdminCaseList();
+        async function renderSavedCases() {
+          try {
+            var savedCases = await getCases();
+            savedCases.forEach(renderCase);
+            updateCaseCount();
+            renderAdminCaseList(savedCases);
+          } catch (error) {
+            console.error(error);
+          }
         }
 
         function setMessage(element, message, isError) {
@@ -553,16 +546,23 @@
           element.classList.toggle("is-error", Boolean(isError));
         }
 
-        function showModal() {
+        async function showModal() {
           modal.hidden = false;
           document.body.classList.add("admin-open");
-          if (sessionStorage.getItem(sessionKey) === "active") {
-            loginView.hidden = true;
-            panelView.hidden = false;
-          } else {
+          try {
+            var session = await apiRequest("/api/admin/session", { headers: {} });
+            if (session.authenticated) {
+              loginView.hidden = true;
+              panelView.hidden = false;
+              await renderSavedCases();
+              return;
+            }
+          } catch (error) {
+            console.error(error);
+          }
+          {
             loginView.hidden = false;
             panelView.hidden = true;
-            document.querySelector("#admin-user").focus();
           }
         }
 
@@ -576,29 +576,33 @@
           element.addEventListener("click", closeModal);
         });
         document.querySelector("[data-admin-logout]").addEventListener("click", function () {
-          sessionStorage.removeItem(sessionKey);
-          loginView.hidden = false;
-          panelView.hidden = true;
-          document.querySelector("[data-login-form]").reset();
-          document.querySelector("#admin-user").focus();
+          apiRequest("/api/admin/logout", { method: "POST" })
+            .finally(function () {
+              loginView.hidden = false;
+              panelView.hidden = true;
+              document.querySelector("[data-login-form]").reset();
+            });
         });
 
-        document.querySelector("[data-login-form]").addEventListener("submit", function (event) {
+        document.querySelector("[data-login-form]").addEventListener("submit", async function (event) {
           event.preventDefault();
           var form = new FormData(event.currentTarget);
-          var password = localStorage.getItem(passwordKey) || defaultPassword;
           var message = document.querySelector("[data-login-message]");
-          if (form.get("username") === "Administrador" && form.get("password") === password) {
-            sessionStorage.setItem(sessionKey, "active");
+          try {
+            await apiRequest("/api/admin/login", {
+              method: "POST",
+              body: JSON.stringify({ username: form.get("username"), password: form.get("password") })
+            });
             loginView.hidden = true;
             panelView.hidden = false;
             setMessage(message, "");
-          } else {
-            setMessage(message, "Login ou senha incorretos.", true);
+            await renderSavedCases();
+          } catch (error) {
+            setMessage(message, error.message, true);
           }
         });
 
-        document.querySelector("[data-case-form]").addEventListener("submit", function (event) {
+        document.querySelector("[data-case-form]").addEventListener("submit", async function (event) {
           event.preventDefault();
           var formElement = event.currentTarget;
           var form = new FormData(formElement);
@@ -613,32 +617,19 @@
             setMessage(message, "Use apenas texto simples, sem tags HTML.", true);
             return;
           }
-          var savedCases = getCases();
-          savedCases.push(item);
-          localStorage.setItem(casesKey, JSON.stringify(savedCases));
-          renderCase(item);
-          updateCaseCount();
-          renderAdminCaseList();
-          formElement.reset();
-          setMessage(message, "Case adicionado ao portfólio.");
-        });
-
-        document.querySelector("[data-password-form]").addEventListener("submit", function (event) {
-          event.preventDefault();
-          var form = new FormData(event.currentTarget);
-          var message = document.querySelector("[data-password-message]");
-          var currentPassword = localStorage.getItem(passwordKey) || defaultPassword;
-          if (form.get("currentPassword") !== currentPassword) {
-            setMessage(message, "A senha atual está incorreta.", true);
-            return;
+          try {
+            var savedCase = await apiRequest("/api/cases", {
+              method: "POST",
+              body: JSON.stringify(item)
+            });
+            renderCase(savedCase);
+            updateCaseCount();
+            formElement.reset();
+            await renderSavedCases();
+            setMessage(message, "Case adicionado ao portfólio.");
+          } catch (error) {
+            setMessage(message, error.message, true);
           }
-          if (form.get("newPassword") !== form.get("confirmPassword")) {
-            setMessage(message, "A confirmação da nova senha não coincide.", true);
-            return;
-          }
-          localStorage.setItem(passwordKey, String(form.get("newPassword")));
-          event.currentTarget.reset();
-          setMessage(message, "Senha alterada com sucesso.");
         });
 
         document.addEventListener("keydown", function (event) {
