@@ -361,6 +361,14 @@
 
     <script>
       (function () {
+        var brandLink = document.querySelector(".brand");
+        if (brandLink) {
+          brandLink.addEventListener("click", function (event) {
+            event.preventDefault();
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          });
+        }
+
         var items = document.querySelectorAll("[data-reveal]");
         if (!("IntersectionObserver" in window) || !items.length) return;
 
