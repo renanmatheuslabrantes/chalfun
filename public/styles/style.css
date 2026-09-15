@@ -665,6 +665,7 @@ h1, h2, h3, h4 {
 }
 
 .admin-trigger {
+  display: inline-block;
   border: 0;
   padding: 0.45rem 0.7rem;
   background: transparent;
@@ -680,30 +681,9 @@ h1, h2, h3, h4 {
   color: var(--gold-soft);
 }
 
-body.admin-open {
-  overflow: hidden;
-}
-
-.admin-modal[hidden],
 .admin-panel[hidden],
 .admin-login[hidden] {
   display: none;
-}
-
-.admin-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: grid;
-  place-items: center;
-  padding: 1rem;
-}
-
-.admin-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(1, 8, 12, 0.78);
-  backdrop-filter: blur(8px);
 }
 
 .admin-dialog {
@@ -718,20 +698,32 @@ body.admin-open {
   box-shadow: var(--shadow);
 }
 
-.admin-close {
-  position: absolute;
-  top: 0.8rem;
-  right: 1rem;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  font-size: 1.8rem;
-  line-height: 1;
-  cursor: pointer;
+.admin-page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, var(--bg-strong) 0%, var(--bg) 100%);
 }
 
-.admin-close:hover {
-  color: var(--text);
+.admin-shell {
+  width: min(100% - 40px, 760px);
+  margin: 0 auto;
+  padding: 2rem 0 4rem;
+}
+
+.admin-back-link {
+  display: inline-block;
+  margin-bottom: 1.2rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.admin-back-link:hover,
+.admin-back-link:focus-visible {
+  color: var(--gold-soft);
+}
+
+.admin-page .admin-dialog {
+  width: 100%;
+  max-height: none;
 }
 
 .admin-intro {
@@ -792,6 +784,7 @@ body.admin-open {
   border-top: 1px solid var(--panel-line);
 }
 
+.admin-case-list-section h2,
 .admin-case-list-section h3 {
   font-size: 1.2rem;
 }
@@ -875,6 +868,7 @@ body.admin-open {
   border-top: 1px solid var(--panel-line);
 }
 
+.admin-password-section h2,
 .admin-password-section h3 {
   font-size: 1.2rem;
 }

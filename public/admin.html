@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Administrador | Chalfun Consultoria</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+    <link rel="stylesheet" href="/styles/style.css" />
+  </head>
+  <body class="admin-page">
+    <main class="admin-shell">
+      <a class="admin-back-link" href="/">&larr; Voltar para o site</a>
+
+      <section class="admin-dialog" aria-labelledby="admin-title">
+        <div class="admin-login" data-admin-login>
+          <p class="eyebrow">ÁREA RESTRITA</p>
+          <h1 id="admin-title">Administrador</h1>
+          <p class="admin-intro">Entre para gerenciar os cases publicados.</p>
+          <form class="admin-form" data-login-form>
+            <label for="admin-user">Login</label>
+            <input id="admin-user" name="username" type="text" autocomplete="username" required />
+            <label for="admin-password">Senha</label>
+            <input id="admin-password" name="password" type="password" autocomplete="current-password" required />
+            <button class="btn btn-primary" type="submit">Entrar</button>
+            <p class="admin-message" data-login-message role="status"></p>
+          </form>
+        </div>
+
+        <div class="admin-panel" data-admin-panel hidden>
+          <div class="admin-panel-heading">
+            <div>
+              <p class="eyebrow">PAINEL</p>
+              <h1>Gerenciar cases</h1>
+            </div>
+            <button class="admin-logout" type="button" data-admin-logout>Sair</button>
+          </div>
+
+          <form class="admin-form" data-case-form>
+            <label for="case-tag">Categoria</label>
+            <input id="case-tag" name="tag" type="text" placeholder="Ex.: IMPLANTAÇÃO" required />
+            <label for="case-title">Nome do case</label>
+            <input id="case-title" name="title" type="text" required />
+            <label for="case-subtitle">Local ou destaque</label>
+            <input id="case-subtitle" name="subtitle" type="text" placeholder="Ex.: Búzios · RJ" required />
+            <label for="case-description">Descrição</label>
+            <textarea id="case-description" name="description" rows="4" required></textarea>
+            <button class="btn btn-primary" type="submit">Adicionar case</button>
+            <p class="admin-message" data-case-message role="status"></p>
+          </form>
+
+          <div class="admin-case-list-section">
+            <h2>Cases adicionados</h2>
+            <div class="admin-case-list" data-admin-case-list></div>
+          </div>
+
+          <div class="admin-password-section">
+            <h2>Alterar senha</h2>
+            <form class="admin-form" data-password-form>
+              <label for="current-password">Senha atual</label>
+              <input id="current-password" name="currentPassword" type="password" autocomplete="current-password" required />
+              <label for="new-password">Nova senha</label>
+              <input id="new-password" name="newPassword" type="password" autocomplete="new-password" minlength="12" required />
+              <label for="confirm-password">Confirmar nova senha</label>
+              <input id="confirm-password" name="confirmPassword" type="password" autocomplete="new-password" minlength="12" required />
+              <button class="btn btn-secondary" type="submit">Salvar nova senha</button>
+              <p class="admin-message" data-password-message role="status"></p>
+            </form>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      (function () {
+        var loginView = document.querySelector("[data-admin-login]");
+        var panelView = document.querySelector("[data-admin-panel]");
+        var adminCaseList = document.querySelector("[data-admin-case-list]");
+
+        async function apiRequest(url, options) {
+          var response = await fetch(url, Object.assign({ headers: { "Content-Type": "application/json" } }, options || {}));
+          var data = await response.json().catch(function () { return {}; });
+          if (!response.ok) throw new Error(data.error || "Não foi possível concluir a operação.");
+          return data;
+        }
+
+        function setMessage(element, message, isError) {
+          element.textContent = message;
+          element.classList.toggle("is-error", Boolean(isError));
+        }
+
+        function renderAdminCaseList(savedCases) {
+          adminCaseList.textContent = "";
+          if (!savedCases.length) {
+            var emptyMessage = document.createElement("p");
+            emptyMessage.className = "admin-empty";
+            emptyMessage.textContent = "Nenhum case adicionado ainda.";
+            adminCaseList.appendChild(emptyMessage);
+            return;
+          }
+          savedCases.forEach(function (item) {
+            var row = document.createElement("div");
+            row.className = "admin-case-row";
+            var title = document.createElement("strong");
+            title.textContent = item.title;
+            var subtitle = document.createElement("span");
+            subtitle.textContent = item.subtitle;
+            var removeButton = document.createElement("button");
+            removeButton.type = "button";
+            removeButton.className = "admin-delete";
+            removeButton.textContent = "Excluir";
+            removeButton.setAttribute("aria-label", "Excluir o case " + item.title);
+            removeButton.addEventListener("click", async function () {
+              if (!window.confirm("Excluir o case \"" + item.title + "\"?")) return;
+              try {
+                await apiRequest("/api/cases/" + encodeURIComponent(item.id), { method: "DELETE" });
+                await loadCases();
+              } catch (error) {
+                window.alert(error.message);
+              }
+            });
+            row.appendChild(title);
+            row.appendChild(subtitle);
+            row.appendChild(removeButton);
+            adminCaseList.appendChild(row);
+          });
+        }
+
+        async function loadCases() {
+          var savedCases = await apiRequest("/api/cases");
+          renderAdminCaseList(Array.isArray(savedCases) ? savedCases : []);
+        }
+
+        async function showPanelIfAuthenticated() {
+          try {
+            var session = await apiRequest("/api/admin/session", { headers: {} });
+            if (session.authenticated) {
+              loginView.hidden = true;
+              panelView.hidden = false;
+              await loadCases();
+            }
+          } catch (error) {
+            console.error(error);
+          }
+        }
+
+        document.querySelector("[data-login-form]").addEventListener("submit", async function (event) {
+          event.preventDefault();
+          var form = new FormData(event.currentTarget);
+          var message = document.querySelector("[data-login-message]");
+          try {
+            await apiRequest("/api/admin/login", {
+              method: "POST",
+              body: JSON.stringify({ username: form.get("username"), password: form.get("password") })
+            });
+            loginView.hidden = true;
+            panelView.hidden = false;
+            setMessage(message, "");
+            await loadCases();
+          } catch (error) {
+            setMessage(message, error.message, true);
+          }
+        });
+
+        document.querySelector("[data-admin-logout]").addEventListener("click", function () {
+          apiRequest("/api/admin/logout", { method: "POST" }).finally(function () {
+            panelView.hidden = true;
+            loginView.hidden = false;
+            document.querySelector("[data-login-form]").reset();
+          });
+        });
+
+        document.querySelector("[data-case-form]").addEventListener("submit", async function (event) {
+          event.preventDefault();
+          var formElement = event.currentTarget;
+          var form = new FormData(formElement);
+          var message = document.querySelector("[data-case-message]");
+          var item = {
+            tag: String(form.get("tag") || "").trim().slice(0, 60).toUpperCase(),
+            title: String(form.get("title") || "").trim().slice(0, 120),
+            subtitle: String(form.get("subtitle") || "").trim().slice(0, 120),
+            description: String(form.get("description") || "").trim().slice(0, 600)
+          };
+          if (Object.values(item).some(function (value) { return /<\/?[a-z][^>]*>/i.test(value); })) {
+            setMessage(message, "Use apenas texto simples, sem tags HTML.", true);
+            return;
+          }
+          try {
+            await apiRequest("/api/cases", { method: "POST", body: JSON.stringify(item) });
+            formElement.reset();
+            await loadCases();
+            setMessage(message, "Case adicionado ao portfólio.");
+          } catch (error) {
+            setMessage(message, error.message, true);
+          }
+        });
+
+        document.querySelector("[data-password-form]").addEventListener("submit", async function (event) {
+          event.preventDefault();
+          var formElement = event.currentTarget;
+          var form = new FormData(formElement);
+          var message = document.querySelector("[data-password-message]");
+          try {
+            await apiRequest("/api/admin/password", {
+              method: "POST",
+              body: JSON.stringify({
+                currentPassword: form.get("currentPassword"),
+                newPassword: form.get("newPassword"),
+                confirmPassword: form.get("confirmPassword")
+              })
+            });
+            formElement.reset();
+            panelView.hidden = true;
+            loginView.hidden = false;
+            setMessage(message, "Senha alterada. Entre novamente com a nova senha.");
+          } catch (error) {
+            setMessage(message, error.message, true);
+          }
+        });
+
+        showPanelIfAuthenticated();
+      })();
+    </script>
+  </body>
+</html>
