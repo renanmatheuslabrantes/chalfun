@@ -8,3 +8,5 @@ export async function middleware() {
     headers: { "content-type": "application/json; charset=utf-8" }
   });
 }
+
+export default middleware;
