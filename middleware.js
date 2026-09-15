@@ -1,8 +1,10 @@
-const { get } = require("@vercel/global-config");
+import { get } from "@vercel/global-config";
 
-async function middleware() {
+export const config = { matcher: "/welcome", runtime: "nodejs" };
+
+export async function middleware() {
   const greeting = await get("greeting");
-  return greeting;
+  return new Response(JSON.stringify(greeting), {
+    headers: { "content-type": "application/json; charset=utf-8" }
+  });
 }
-
-module.exports = { middleware };

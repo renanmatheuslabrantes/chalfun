@@ -2,7 +2,6 @@ const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
-const { middleware: globalConfigMiddleware } = require("./middleware");
 
 loadEnvFile();
 
@@ -36,6 +35,7 @@ async function routeRequest(request, response) {
 
   if (requestUrl.pathname === "/welcome" && request.method === "GET") {
     try {
+      const { middleware: globalConfigMiddleware } = await import("./middleware-node.mjs");
       const greeting = await globalConfigMiddleware();
       return sendJson(response, 200, greeting);
     } catch (error) {
