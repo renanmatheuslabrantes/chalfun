@@ -1,12 +1,11 @@
 const crypto = require("node:crypto");
 const auth = require("./_lib/auth");
-
-const cases = globalThis.__chalfunCases || [];
-globalThis.__chalfunCases = cases;
+const store = require("./_lib/store");
 
 module.exports = async function handler(request, response) {
-  if (request.method === "GET") return auth.sendJson(response, 200, cases);
-  if (!auth.isAuthenticated(request)) return auth.sendJson(response, 401, { error: "Não autenticado." });
+  const data = await store.readAdminData();
+  if (request.method === "GET") return auth.sendJson(response, 200, data.cases);
+  if (!auth.isAuthenticated(request, data.passwordHash)) return auth.sendJson(response, 401, { error: "Não autenticado." });
 
   if (request.method === "POST") {
     try {
@@ -21,7 +20,8 @@ module.exports = async function handler(request, response) {
       if (Object.values(item).some((value) => !value) || Object.values(item).some(containsHtml)) {
         return auth.sendJson(response, 400, { error: "Preencha os campos com texto simples." });
       }
-      cases.push(item);
+      data.cases.push(item);
+      await store.writeAdminData(data);
       return auth.sendJson(response, 201, item);
     } catch {
       return auth.sendJson(response, 400, { error: "Dados do case inválidos." });

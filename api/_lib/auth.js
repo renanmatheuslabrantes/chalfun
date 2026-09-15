@@ -13,11 +13,11 @@ function parseCookies(request) {
   }, {});
 }
 
-function isAuthenticated(request) {
+function isAuthenticated(request, passwordHash) {
   const token = parseCookies(request).chalfun_session;
-  if (!token || !process.env.ADMIN_PASSWORD_HASH) return false;
+  if (!token || !passwordHash) return false;
   const [payload, signature] = token.split(".");
-  if (!payload || !signature || !timingSafeSignature(payload, signature)) return false;
+  if (!payload || !signature || !timingSafeSignature(payload, signature, passwordHash)) return false;
   try {
     const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
     return data.exp > Date.now();
@@ -26,9 +26,9 @@ function isAuthenticated(request) {
   }
 }
 
-function createSession(response) {
+function createSession(response, passwordHash) {
   const payload = Buffer.from(JSON.stringify({ exp: Date.now() + sessionMaxAge })).toString("base64url");
-  const signature = crypto.createHmac("sha256", process.env.ADMIN_PASSWORD_HASH).update(payload).digest("base64url");
+  const signature = crypto.createHmac("sha256", passwordHash).update(payload).digest("base64url");
   const token = `${payload}.${signature}`;
   response.setHeader("Set-Cookie", cookieHeader("chalfun_session", token, sessionMaxAge));
 }
@@ -37,8 +37,8 @@ function clearSession(request, response) {
   response.setHeader("Set-Cookie", cookieHeader("chalfun_session", "", 0));
 }
 
-function timingSafeSignature(payload, signature) {
-  const expected = crypto.createHmac("sha256", process.env.ADMIN_PASSWORD_HASH).update(payload).digest("base64url");
+function timingSafeSignature(payload, signature, passwordHash) {
+  const expected = crypto.createHmac("sha256", passwordHash).update(payload).digest("base64url");
   const actualBuffer = Buffer.from(signature);
   const expectedBuffer = Buffer.from(expected);
   return actualBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(actualBuffer, expectedBuffer);

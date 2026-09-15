@@ -1,14 +1,14 @@
 const auth = require("../_lib/auth");
+const store = require("../_lib/store");
 
-const cases = globalThis.__chalfunCases || [];
-globalThis.__chalfunCases = cases;
-
-module.exports = function handler(request, response) {
+module.exports = async function handler(request, response) {
   if (request.method !== "DELETE") return auth.sendJson(response, 405, { error: "Método não permitido." });
-  if (!auth.isAuthenticated(request)) return auth.sendJson(response, 401, { error: "Não autenticado." });
+  const data = await store.readAdminData();
+  if (!auth.isAuthenticated(request, data.passwordHash)) return auth.sendJson(response, 401, { error: "Não autenticado." });
   const id = String(request.query.id || "");
-  const index = cases.findIndex((item) => item.id === id);
+  const index = data.cases.findIndex((item) => item.id === id);
   if (index === -1) return auth.sendJson(response, 404, { error: "Case não encontrado." });
-  cases.splice(index, 1);
+  data.cases.splice(index, 1);
+  await store.writeAdminData(data);
   return auth.sendJson(response, 200, { deleted: true });
 };
