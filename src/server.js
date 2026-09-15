@@ -3,11 +3,13 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 
+const projectRoot = path.resolve(__dirname, "..");
+
 loadEnvFile();
 
 const port = Number(process.env.PORT || 3000);
-const publicRoot = __dirname;
-const dataDirectory = path.join(__dirname, "data");
+const publicRoot = path.join(projectRoot, "public");
+const dataDirectory = path.join(projectRoot, "data");
 const casesFile = path.join(dataDirectory, "cases.json");
 const sessions = new Map();
 const loginAttempts = new Map();
@@ -35,7 +37,7 @@ async function routeRequest(request, response) {
 
   if (requestUrl.pathname === "/welcome" && request.method === "GET") {
     try {
-      const { middleware: globalConfigMiddleware } = await import("./middleware-node.mjs");
+      const { middleware: globalConfigMiddleware } = await import("./integrations/global-config.mjs");
       const greeting = await globalConfigMiddleware();
       return sendJson(response, 200, greeting);
     } catch (error) {
@@ -250,7 +252,7 @@ function sendText(response, status, body) {
 
 function loadEnvFile() {
   for (const fileName of [".env.local", ".env"]) {
-    const envPath = path.join(__dirname, fileName);
+    const envPath = path.join(projectRoot, fileName);
     if (!fs.existsSync(envPath)) continue;
     for (const line of fs.readFileSync(envPath, "utf8").split(/\r?\n/)) {
       const match = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/i);

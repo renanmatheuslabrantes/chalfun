@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Site da Chalfun Consultoria com painel administrativo protegido",
   "scripts": {
-    "start": "node server.js",
+    "start": "node src/server.js",
     "generate-password-hash": "node scripts/generate-password-hash.js"
   },
   "dependencies": {

@@ -2,6 +2,14 @@
 
 Site estático servido por um backend Node.js com painel administrativo protegido.
 
+## Estrutura
+
+- `public/`: página pública, estilos e assets do site.
+- `src/`: servidor local e integrações usadas fora das rotas da Vercel.
+- `api/`: funções serverless da Vercel.
+- `data/`: dados locais usados pelo servidor de desenvolvimento.
+- `scripts/`: scripts auxiliares de manutenção.
+
 ## Configuração local
 
 Requer Node.js 18 ou mais recente.

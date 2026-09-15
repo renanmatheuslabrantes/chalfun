@@ -2,5 +2,6 @@
 data/cases.json
 node_modules/
 .vercel
+server.log
 .env*
 !.env.example
